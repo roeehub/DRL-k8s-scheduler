@@ -12,8 +12,14 @@ WORKDIR /usr/app/src
 
 #to COPY the remote file at working directory in container
 COPY random_sched.py ./
+COPY requirements.txt ./
+COPY config ./
+
 # Now the structure looks like this '/usr/app/src/test.py'
 
+# Install all packages required
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 #CMD instruction should be used to run the software
 #contained by your image, along with any arguments.

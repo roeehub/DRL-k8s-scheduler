@@ -6,7 +6,7 @@ import json
 
 from kubernetes import client, config, watch
 
-config.load_kube_config()
+config.load_kube_config("config")
 v1 = client.CoreV1Api()
 
 scheduler_name = "foobar"
@@ -39,9 +39,14 @@ def scheduler(name, node, namespace="default"):
 
 
 def main():
+    i = 0
     print("Starting random scheduler")
     w = watch.Watch()
     for event in w.stream(v1.list_namespaced_pod, "default"):
+        i += 1
+        if i % 20 == 0:
+            print("I'm alive")
+            i = 0
         if event['object'].status.phase == "Pending" and event['object'].spec.scheduler_name == scheduler_name:
             try:
                 res = scheduler(event['object'].metadata.name, random.choice(nodes_available()))
