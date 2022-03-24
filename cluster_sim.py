@@ -3,7 +3,7 @@ import random
 import threading
 import uuid
 import logging
-from time import sleep
+from constants import *
 import numpy as np
 import coloredlogs
 import utils
@@ -23,15 +23,6 @@ logging.basicConfig(
 
 coloredlogs.install()
 
-NUM_OF_NODES = 3
-NODE_MEMORY = 1
-MAX_NUM_OF_PODS = 15
-SPAWN_TIME_INTERVAL_SECS = 3
-UTILITY_LOG_INTERVAL_SECS = 10  # 0.75
-RUN_TIME_SECONDS = 12
-MIN_TIME_POD = 10  # 0.0001
-MAX_TIME_POD = 30  # 0.001
-
 
 class PodState:
     pending = 0
@@ -41,7 +32,8 @@ class PodState:
 class Pod:
     def __init__(self):
         self.state = PodState.pending
-        self.memory = abs(round(np.random.normal(loc=0.2, scale=0.19), 2))
+        self.memory = \
+            max(round(np.random.normal(loc=POD_MEMORY_EXPECTATION, scale=POD_MEMORY_VARIANCE), 2), POD_MIN_MEMORY)
         self.run_time_seconds = random.uniform(MIN_TIME_POD, MAX_TIME_POD)
         self.uuid = str(uuid.uuid4())[:6]
         self.creation_time = datetime.datetime.now()
@@ -60,10 +52,10 @@ class Node:
 
 
 class Cluster:
-    def __init__(self, number_of_nodes, node_selection_func):
+    def __init__(self, number_of_nodes):
         logging.info("Initializing cluster...")
-        logging.info(f"Cluster config: NUM_OF_NODES = {NUM_OF_NODES}, NODE_MEMORY = {NODE_MEMORY},"
-                     f" SPAWN_TIME_INTERVAL_SECS = {SPAWN_TIME_INTERVAL_SECS}")
+        logging.info(f"Cluster config: {NUM_OF_NODES=}, {NODE_MEMORY=}, {SPAWN_TIME_INTERVAL_SECS=}, {MAX_NUM_OF_PODS=}, "
+                     f"{ALPHA=}, {GAMMA=}")
         self.nodes = [Node(index) for index in range(number_of_nodes)]
         self.new_pods_to_add = {}
         self.pending_pods = {}
@@ -119,33 +111,36 @@ class Cluster:
 
     def schedule_pod(self, node_index):
         pod_uuid_to_sched = sorted(self.pending_pods, key=lambda x: self.pending_pods[x].creation_time)[0]
-        logging.info(f"Inside schedule pod, with pod {pod_uuid_to_sched}")
-        logging.info(f"node_index: {node_index}")
+        # logging.info(f"Inside schedule pod, with pod {pod_uuid_to_sched}")
+        # logging.info(f"node_index: {node_index}")
         overload = False
         if node_index > -1:  # decided to schedule
             node = self.nodes[node_index]
             pod = self.pending_pods[pod_uuid_to_sched]
-            logging.info(f"{pod.memory=}, {node.memory_left=}")
+            # logging.info(f"{pod.memory=}, {node.memory_left=}")
             if pod.memory < node.memory_left:
-                logging.info(f"Pod {pod.uuid} scheduled on Node {node.index}")
                 # node
                 node.memory_left -= pod.memory
                 node.pods[pod_uuid_to_sched] = pod
                 # pod
                 pod.state = PodState.assigned
-                threading.Timer(pod.run_time_seconds, self.pod_finished, [node, pod]).start()
                 scheduled = True
                 self.pending_pods.pop(pod.uuid)
                 self.assigned_pods[pod.uuid] = pod
+                threading.Timer(pod.run_time_seconds, self.pod_finished, [node, pod]).start()
+                logging.info(f"Pod {pod.uuid} with memory demand {pod.memory} is scheduled on:")
+                logging.info(f"Node {node.index} with {node.memory_left} memory left")
             else:
-                logging.info("Insufficient memory for pod")
+                logging.info(f"Insufficient memory {pod.memory=}, {node.memory_left=}")
                 overload = True
                 scheduled = False
         else:  # Put in back of line
-            logging.info(f"index was {node_index}")
+            logging.info(f"action was {node_index=}")
             scheduled = False
             self.pending_pods[pod_uuid_to_sched].creation_time = datetime.datetime.now()
-        logging.info(f"{scheduled=}, {overload=}")
+        if overload:
+            pass
+            # logging.info(f"OVERLOAD!")
         return scheduled, overload
 
     def get_cluster_view(self, target_pod):  # TODO json format?
@@ -179,12 +174,10 @@ class Cluster:
         if random.random() > num_of_pods / MAX_NUM_OF_PODS:
             new_pod = Pod()
             self.pending_pods[new_pod.uuid] = new_pod
-            logging.info(f"New pod pending! UUID: {new_pod.uuid}, Memory: {new_pod.memory}, runtime: "
-                         f"{new_pod.run_time_seconds}")
+            # logging.info(f"New pod pending! UUID: {new_pod.uuid}, Memory: {new_pod.memory}")
         else:
-            logging.warning(f"Pod not created.")
-        logging.warning(f"{len(self.pending_pods)} pods are currently pending")
-        logging.warning(f"{len(self.assigned_pods)} pods are currently assigned")
+            pass
+            # logging.warning(f"Tried to spawn pod but no luck, {num_of_pods=}, {MAX_NUM_OF_PODS=}")
 
     def pod_finished(self, node, pod):
         node.memory_left += pod.memory
@@ -203,14 +196,16 @@ class Cluster:
         total_cluster_memory_2f = "{:.2f}".format(round(sum(node_capacities) / NUM_OF_NODES, 2) * 100)
         logging.warning(f"Total cluster memory utility: {total_cluster_memory_2f}%")
         logging.warning(f"Number of pending pods: {len(self.pending_pods)}")
+        logging.warning(f"Number of assigned pods: {len(self.assigned_pods)}")
         logging.warning("-"*100)
 
 
-def random_scheduler(cluster_view):
+def random_scheduler():
     if random.random() > 0.95:
         return -1
     return random.choice(list(range(NUM_OF_NODES)))
 
 
-# cluster = Cluster(3, None)
-# cluster.train_run(60)
+# cluster = Cluster(3)
+# cluster.train_run(10)
+# logging.critical(MAX_NUM_OF_PODS)
