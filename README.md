@@ -14,6 +14,13 @@ Scheduling pods to nodes - that is, assigning each pod to a node on which it wil
 
 The goal of this project is to design and implement an alternative scheduler for Kubernetes, utilizing recent advances in deep reinforcement learning to combine low running time with high quality of the produced placements. This RL-based scheduler will repeatedly attempt different pod placements in the cluster and learn the most potent scheduling decisions based on the resulting application performance and resource utilization. The scheduler will be fully compatible with any application currently relying on the default Kubernetes scheduler in terms of API and the supported parameters and constraints.
 
+## Repo files overview
+.yaml files: basic configurations for a kind cluster. Checkout kind as a tool for simulating local k8s.
+cluster_sim.py: Cluster simulation for training.
+test_sim.py: Cluster simulation for testing.
+constants.py: all the constants for the program.
+kubernetes.ipynb: the learning environment.
+
 ## Current progress
 For developing purposes, we built a k8s simulator in the file cluster_sim.py. There we define three objects: Cluster, Node, and Pod. running a cluster in the simulation creates pods at a controlled pace, and assigns them to Nodes via some given scheduling function. This simulation allows us to train our model in a controlled and transparent environment. 
 Note that a very similar file called test_sim.py exists. Its purpose is to run the simulation for testing, without integration with the learning regiment.
